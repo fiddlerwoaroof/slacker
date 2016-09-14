@@ -1,13 +1,5 @@
 (in-package :slacker)
 
-(defclass event-pump ()
-  ((%ws-client :accessor ws-client :initarg :ws-client)
-   (%waiting-pings :accessor waiting-pings :initform 0)
-   (%modules :accessor modules :initform (make-hash-table))
-   (%latest-id :accessor latest-id :initform 0)
-   (%work-queue :accessor work-queue :initform (make-instance 'chanl:unbounded-channel))
-   (%result-queue :accessor result-queue :initform (make-instance 'chanl:unbounded-channel))))
-
 (defmethod attach-module ((event-pump event-pump) module &rest args &key)
   (setf (gethash (make-keyword module)
 		 (modules event-pump))
@@ -189,6 +181,10 @@
 	   ,@body)
        (setf (gethash ,name *command-table*) (function ,command-sym)))))
 
+(defun safe-apply (func event-pump ts channel args)
+  (with-simple-restart (continue "Skip command")
+    (apply func event-pump ts channel args)))
+
 (defun handle-command (event-pump ts channel command args)
   (declare (ignorable args))
   (let* ((command (subseq (plump:decode-entities command) 1))
@@ -197,8 +193,51 @@
     (terpri)
     (print command)
     (if handler
-	(apply handler event-pump ts channel args)
-	(queue-message event-pump channel (concat "I don't underand the command `" command "`.")))))
+	(safe-apply handler event-pump ts channel args)
+	(queue-message event-pump channel (concat "I don't understand the command `" command "`.")))))
+
+(defun slack-api-call (method &rest args)
+  (bb:with-promise (resolve reject)
+    (bt:make-thread
+     (lambda ()
+       (handler-case
+	   (let ((api-result (yason:parse
+			      (babel:octets-to-string 
+			       (drakma:http-request (concat "https://slack.com/api/" method "?token=" *api-token*)
+						    :method :post
+						    :content (quri:url-encode-params
+							      (loop for (key value) on args by #'cddr
+								 collect (cons (string-downcase key) value)))
+						    :proxy (list "127.0.0.1" 8080))))))
+	     ;todo error handling . . .
+	     (resolve api-result)) 
+	 (t (c) (reject c)))))))
+
+(defgeneric api-call (name args)
+  (:method ((name symbol) (args list))
+    (slack-api-call ,)))
+
+(defmacro define-api-wrapper (name required-args &rest args)
+  (flet ((name-case (string)
+	   (let ((parts (split-sequence #\- (string-downcase string))))
+	     (apply #'concatenate 'string
+		    (car parts)
+		    (mapcar #'string-capitalize (cdr parts))))))
+    (let* ((api-method-name (name-case name)))
+      `(progn (defun ,name (,@required-args &rest r &key ,@args)
+		(apply #'slack-api-call ,api-method-name
+		       ,@(loop for req-arg in required-args
+			    append (list (make-keyword req-arg) req-arg))
+		       r))
+	      (eval-when (:compile-toplevel :load-toplevel :execute)
+		(let ((*package* 'slacker.api))
+		  (import ',name)
+		  (export ',name)))))))
+
+
+(defmacro define-api-wrappers (&body body)
+  `(progn ,@(loop for (name required-args . rest) in body
+		 collect `(define-api-wrapper ,name ,required-args ,@rest))))
 
 (defun edit-message (ts channel text)
   (babel:octets-to-string
@@ -236,4 +275,13 @@
 	("channel" . ,channel)
 	("text" . ,data)))
      s)))
+
+
+(in-package :slacker.api)
+
+(slacker::define-api-wrappers
+  (chat.delete (ts channel) as_user)
+  (chat.me-message (channel text))
+  (chat.post-message (channel text) parse link_name attachments unfurl_links unfurl_media username as_user icon_uri icon_emoji)
+  (chat.update (ts channel text) attachments parse link_names as_user))
 
