@@ -9,6 +9,9 @@
 	   #:help #:make-message #:modules #:latest-id #:work-queue #:result-queue
 	   #:ws-client #:waiting-pings #:ts #:channel))
 
+(defpackage slacker.api
+  (:use))
+
 (defpackage :hhgbot-augmented-assistant
   (:use :cl :alexandria :serapeum :slacker))
 ;; (defpackage #:hhgbot
