@@ -106,6 +106,18 @@
   (:use :cl :alexandria :serapeum :slacker :vecto)
   (:shadowing-import-from :alexandria :rotate))
 
+(defparameter *zxcv* *standard-output*)
+
+(define-command "lss" (event-pump ts channel)
+  (fw.lu:let-each (:be *)
+    #p"~/public_html/Screenshots/"
+    (uiop:directory-files *)
+    (sort * #'> :key #'file-write-date)
+    (car *)
+    (uiop/common-lisp:enough-namestring * #p"~/public_html/")
+    (concat "https://srv2.elangley.org/~edwlan/" *)
+    (slacker.api:chat.post-message channel * :as_user t :icon_emoji "camera_with_flash")))
+
 (in-package :vecto-example)
 (defmacro with ((var val) &body body)
   `(let ((,var ,val))
