@@ -43,6 +43,9 @@
 (defgeneric start-module (client module)
   (:documentation "start a module"))
 
+(define-condition connection-lost ()
+  ())
+
 (defun start-client (&key modules)
  (let* ((event-pump (make-instance 'event-pump))
 	(client (make-client event-pump)))
@@ -59,7 +62,12 @@
 		(websocket-driver:start-connection client)
 
 		(as:with-interval (15)
-		  (send-message event-pump :ping))
+		  (restart-case
+		      (if (> 100 (waiting-pings event-pump))
+			  (send-message event-pump :ping)
+			  (error 'connection-lost))
+		    (restart-server ()
+		      (websocket-driver:start-connection client))))
 
 		(as:with-interval (0.01)
 		  (multiple-value-bind (message message-p)
