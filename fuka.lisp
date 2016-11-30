@@ -57,7 +57,7 @@
 
 
 (defparameter *api-token*
-  "***REMOVED***")
+  "DEL")
 
 (defgeneric send-message (client type &optional data))
 
