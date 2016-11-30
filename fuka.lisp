@@ -57,7 +57,7 @@
 
 
 (defparameter *api-token*
-  "xoxb-21694007908-XtlBghcRjIZkTZCIbXQgdMIf")
+  "DEL")
 
 (defgeneric send-message (client type &optional data))
 
