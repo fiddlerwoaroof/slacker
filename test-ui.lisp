@@ -3,6 +3,7 @@
 ;; Special Variables
 
 (defvar *client*)
+(defvar *queue-pair* nil)
 ;; Macros
 
 (defun start-in-repl (&optional (start-bot t))
@@ -13,13 +14,16 @@
       slacker::*api-token*))
 
 (defun start-with-apitoken ()
+  (unless *queue-pair*
+    (setf *queue-pair* (make-instance 'slacker::queue-pair)))
+
   (ubiquitous:restore :hhgbot-augmented-assistant)
   (let ((slacker::*api-token* (ubiquitous:value :api-token :atomampd)))
     (unless slacker::*api-token*
       (format *terminal-io* "~&API Token? ")
       (finish-output *terminal-io*)
       (setf slacker::*api-token* (read-line)))
-    (values (slacker:coordinate-threads)
+    (values (slacker:coordinate-threads *queue-pair*)
 	    slacker::*api-token*)))
 
 (defmacro if-let* ((&rest bindings) &body (then-form &optional else-form))
@@ -29,10 +33,6 @@
        ,then-form
        ,else-form)))
 ;; Utility functions
-
-(defun pick (keys h-t)
-  (mapcar (plambda:plambda (gethash :1 h-t))
-          keys))
 
 (define-command "myip" (event-pump ts channel)
   (in-wq (event-pump)
