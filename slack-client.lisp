@@ -21,10 +21,11 @@
 	     (self (gethash "self" slack-data))
 	     (users (gethash "users" slack-data))
 	     (client (wsd:make-client url)))
-
 	(declare (ignorable self users))
 	(wsd:on :message client
 		(lambda (message)
+		  #+null
+		  (format t "~&Got a message ~a~%" message)
 		  (chanl:send (result-queue event-pump)
 			      message)))
 	client))))
@@ -46,40 +47,43 @@
 (define-condition connection-lost ()
   ())
 
-(defun start-client (&key modules)
- (let* ((event-pump (make-instance 'event-pump))
-	(client (make-client event-pump)))
-   (setf (ws-client event-pump)
-	 client)
-   (values event-pump
-	   (bt:make-thread 
-	    (lambda ()
-	      (loop for (module . args) in modules
-		 do (start-module event-pump
-				  (apply #'attach-module
-					 event-pump module args)))
-	      (as:with-event-loop () 
-		(websocket-driver:start-connection client)
+(defun start-client (&key queue-pair modules)
+  (unless queue-pair
+    (setf queue-pair (make-instance 'queue-pair)))
 
-		(as:with-interval (15)
-		  (restart-case
-		      (if (> 100 (waiting-pings event-pump))
-			  (send-message event-pump :ping)
-			  (error 'connection-lost))
-		    (restart-server ()
-		      (websocket-driver:start-connection client))))
+  (let* ((event-pump (make-instance 'event-pump :queue-pair queue-pair))
+	 (client (make-client event-pump)))
+    (setf (ws-client event-pump)
+	  client)
+    (values event-pump
+	    (bt:make-thread 
+	     (lambda ()
+	       (loop for (module . args) in modules
+		  do (start-module event-pump
+				   (apply #'attach-module
+					  event-pump module args)))
+	       (as:with-event-loop () 
+		 (websocket-driver:start-connection client)
 
-		(as:with-interval (0.01)
-		  (multiple-value-bind (message message-p)
-		      (chanl:recv (work-queue event-pump)
-				  :blockp nil)
-		    (when message-p
-		      (format t "Got a message")
-		      (funcall message
-			       event-pump)))
-		  :event-cb (lambda (ev)
-			      (format t "~&EVENT: ~a~%" ev)))))
-	    :name "Event Server"))))
+		 (as:with-interval (15)
+		   (restart-case
+		       (if (> 100 (waiting-pings event-pump))
+			   (send-message event-pump :ping)
+			   (error 'connection-lost))
+		     (restart-server ()
+		       (websocket-driver:start-connection client))))
+
+		 (as:with-interval (0.01)
+		   (multiple-value-bind (message message-p)
+		       (chanl:recv (work-queue event-pump)
+				   :blockp nil)
+		     (when message-p
+		       (format t "Got a message")
+		       (funcall message
+				event-pump)))
+		   :event-cb (lambda (ev)
+			       (format t "~&EVENT: ~a~%" ev)))))
+	     :name "Event Server"))))
 
 (defmethod get-event-nonblocking ((event-pump event-pump) &key (object-as :hash-table))
   (multiple-value-bind (message message-p) (chanl:recv (result-queue event-pump) :blockp nil)
@@ -134,8 +138,8 @@
 	       (reply )))
        do (sleep 0.01)))
 
-(defun coordinate-threads ()
-  (let* ((event-pump (start-client :modules '((hhgbot-augmented-assistant::js-executor)))))
+(defun coordinate-threads (&optional queue-pair)
+  (let* ((event-pump (start-client :queue-pair queue-pair :modules '((hhgbot-augmented-assistant::js-executor)))))
     (bt:make-thread (lambda ()  (event-loop event-pump))
 		    :name "Event Loop") 
     event-pump))

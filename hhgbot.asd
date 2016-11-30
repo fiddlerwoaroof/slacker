@@ -21,6 +21,7 @@
           #:puri
           #:serapeum
           #:ubiquitous
+	  #:vecto
           #:websocket-driver
           #:yason
           )

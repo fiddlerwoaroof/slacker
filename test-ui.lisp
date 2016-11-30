@@ -3,23 +3,27 @@
 ;; Special Variables
 
 (defvar *client*)
+(defvar *queue-pair* nil)
 ;; Macros
 
 (defun start-in-repl (&optional (start-bot t))
   (ubiquitous:restore :hhgbot-augmented-assistant)
-  (setf slacker::*api-token* (ubiquitous:value :api-token :***REMOVED***))
+  (setf slacker::*api-token* (ubiquitous:value :api-token :atomampd))
   (if start-bot
       (start-with-apitoken)
       slacker::*api-token*))
 
 (defun start-with-apitoken ()
+  (unless *queue-pair*
+    (setf *queue-pair* (make-instance 'slacker::queue-pair)))
+
   (ubiquitous:restore :hhgbot-augmented-assistant)
-  (let ((slacker::*api-token* (ubiquitous:value :api-token :***REMOVED***)))
+  (let ((slacker::*api-token* (ubiquitous:value :api-token :atomampd)))
     (unless slacker::*api-token*
       (format *terminal-io* "~&API Token? ")
       (finish-output *terminal-io*)
       (setf slacker::*api-token* (read-line)))
-    (values (slacker:coordinate-threads)
+    (values (slacker:coordinate-threads *queue-pair*)
 	    slacker::*api-token*)))
 
 (defmacro if-let* ((&rest bindings) &body (then-form &optional else-form))
@@ -29,10 +33,6 @@
        ,then-form
        ,else-form)))
 ;; Utility functions
-
-(defun pick (keys h-t)
-  (mapcar (plambda:plambda (gethash :1 h-t))
-          keys))
 
 (define-command "myip" (event-pump ts channel)
   (in-wq (event-pump)
@@ -49,15 +49,15 @@
 	    (cond (rest
 		   "I don't understand . . .")
 		  (issue-number
-		   (format nil "https://***REMOVED***.atlassian.net/browse/~A-~A"
+		   (format nil "https://atomampd.atlassian.net/browse/~A-~A"
 			   project issue-number))
 		  (t
-		   (format nil "https://***REMOVED***.atlassian.net/browse/ATOMOS-~a"
+		   (format nil "https://atomampd.atlassian.net/browse/ATOMOS-~a"
 			   project)))))))
 
 (define-command "pr" (event-pump ts channel num)
   (let ((num (parse-integer num)))
-    (edit-message ts channel (format nil "https://bitbucket.org/***REMOVED***/atomos/pull-requests/~d?w=1" num))))
+    (edit-message ts channel (format nil "https://bitbucket.org/atomampd/atomos/pull-requests/~d?w=1" num))))
 
 (define-command "js>" (event-pump ts channel &rest args)
   (declare (ignorable ts))
@@ -80,7 +80,7 @@
 
 (define-command "paste" (event-pump ts channel)
   (with-simple-restart (abort "Stop command")
-    (ubiquitous:restore :***REMOVED***-slack)
+    (ubiquitous:restore :atomampd-slack)
     (format t "foo")
     (let ((drakma:*drakma-default-external-format* :utf-8))
       (edit-message ts channel

@@ -13,7 +13,7 @@
   (set-macro-character #\} (get-macro-character #\) nil)))
 
 (defparameter *api-token*
-  "***REMOVED***")
+  "DEL")
 
 
 (defun write-crlf (stream)
