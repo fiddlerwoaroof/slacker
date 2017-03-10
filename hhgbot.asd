@@ -24,11 +24,11 @@
 	  #:vecto
           #:websocket-driver
           #:yason
+	  #:vecto
           )
   :serial t
   :components ((:file "package")
                (:file "event-pump")
                (:file "js-executor")
-               (:file "slack-client")
-               (:file "test-ui")))
+               (:file "slack-client")))
 

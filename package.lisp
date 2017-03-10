@@ -7,7 +7,8 @@
 	   #:in-wq #:aconsf #:queue-message #:command-error #:unsupported-args
 	   #:define-command #:edit-message #:with-output-to-message
 	   #:help #:make-message #:modules #:latest-id #:work-queue #:result-queue
-	   #:ws-client #:waiting-pings #:ts #:channel))
+	   #:ws-client #:waiting-pings #:ts #:channel :get-module
+	   #:keep-in-thread #:ensure-thread #:handle-message))
 
 (defpackage slacker.api
   (:use))
