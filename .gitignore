@@ -4,3 +4,6 @@
 .fasl
 *.fasl
 *.so
+*.*fsl
+python/
+a.out

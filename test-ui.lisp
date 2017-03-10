@@ -1,24 +1,24 @@
 (cl:in-package :hhgbot-augmented-assistant)
 
 ;; Special Variables
-
+(defparameter *zxcv* *standard-output*)
 (defvar *client*)
 (defvar *queue-pair* nil)
 ;; Macros
 
-(defun start-in-repl (&optional (start-bot t))
+(defun start-in-repl (&optional (start-bot t) (team-id :atomampd))
   (ubiquitous:restore :hhgbot-augmented-assistant)
   (setf slacker::*api-token* (ubiquitous:value :api-token :atomampd))
   (if start-bot
-      (start-with-apitoken)
+      (start-with-apitoken team-id)
       slacker::*api-token*))
 
-(defun start-with-apitoken ()
+(defun start-with-apitoken (&optional (team-id :atomampd))
   (unless *queue-pair*
     (setf *queue-pair* (make-instance 'slacker::queue-pair)))
 
   (ubiquitous:restore :hhgbot-augmented-assistant)
-  (let ((slacker::*api-token* (ubiquitous:value :api-token :atomampd)))
+  (let ((slacker::*api-token* (ubiquitous:value :api-token team-id)))
     (unless slacker::*api-token*
       (format *terminal-io* "~&API Token? ")
       (finish-output *terminal-io*)
@@ -145,7 +145,7 @@
   (bt:make-thread
    (lambda ()
      (declare (optimize (debug 3)))
-     (let ((*default-pathname-defaults* "/home/edwlan/github_repos/hhgbot/"))
+     (let ((*default-pathname-defaults* #p"/home/edwlan/github_repos/hhgbot/"))
        (with-canvas (:width 90 :height 90)
 	 (let ((font (get-font "times.ttf"))
 	       (step (/ pi 7)))
