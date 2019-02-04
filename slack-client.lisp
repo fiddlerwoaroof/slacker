@@ -97,7 +97,7 @@
 	       event-pump))))
 
 (defun send-pings (event-pump client)
-  "Ping slack for connectivity, error if we have more than 100 waiting pings."
+  "Ping slack for connectivity, error if we have too many waiting pings."
   ;; Eventually drop client
   (declare (ignorable client))
   (if (> 100 (waiting-pings event-pump))
@@ -123,7 +123,9 @@
 	      (setf connected nil)
 	      (clear-waiting-pings event-pump)
 	      (as:with-delay (10)
-		(websocket-driver:start-connection (setf client (funcall client-factory)))
+                (cl+ssl:reset-library)
+                (websocket-driver:start-connection
+                 (setf client (funcall client-factory)))
 		(setf connected t))))))
       (as:with-interval (0.01)
 	(when connected
@@ -136,7 +138,9 @@
 	 (client-factory (op (make-client event-pump))))
     (values event-pump
 	    (bt:make-thread (lambda ()
-			      (network-loop event-pump client-factory modules))
+                              (network-loop event-pump
+                                            client-factory
+                                            modules))
 			    :name "Event Server"
 			    :initial-bindings `((*api-token* . ,*api-token*))))))
 
@@ -177,7 +181,8 @@
 	      (parsed-message (tokens msg))) 
     (when (eql #\; (elt msg 0))
       (handle-command event-pump message channel
-		      (car parsed-message)
+                      (plump:decode-entities
+                       (car parsed-message))
 		      (cdr parsed-message))))) 
 
 (defun event-loop (event-pump)
@@ -195,7 +200,8 @@
        do (sleep 0.01)))
 
 (defun coordinate-threads (&optional queue-pair)
-  (let* ((event-pump (start-client :queue-pair queue-pair :modules '((hhgbot-augmented-assistant::js-executor)))))
+  (let* ((event-pump (start-client :queue-pair queue-pair
+                                   :modules '((hhgbot-augmented-assistant::js-executor)))))
     (bt:make-thread (lambda ()  (event-loop event-pump))
 		    :name "Event Loop") 
     event-pump))
@@ -248,14 +254,16 @@
 
 (defun handle-command (event-pump message channel command args)
   (declare (ignorable args))
-  (let* ((command (subseq (plump:decode-entities command) 1))
+  (let* ((command (subseq command 1))
 	 (handler (gethash command *command-table*)))
     (print (hash-table-alist *command-table*))
     (terpri)
     (print command)
     (if handler
 	(safe-apply handler event-pump message channel args)
-	(queue-message event-pump channel (concat "I don't understand the command `" command "`.")))))
+        (queue-message event-pump channel
+                       (concat "I don't understand the command `" command "`.")
+                       :thread (ensure-thread message)))))
 
 (defun slack-api-call (method &rest args)
   (bb:with-promise (resolve reject)
@@ -369,6 +377,7 @@
   (channels.list () exclude_archived)
   (chat.delete (ts channel) as_user)
   (chat.me-message (channel text))
-  (chat.post-message (channel text) parse link_name attachments unfurl_links unfurl_media username as_user icon_uri icon_emoji)
+  (chat.post-message (channel text)
+                     parse link_name attachments unfurl_links unfurl_media username as_user icon_uri icon_emoji)
   (chat.update (ts channel text) attachments parse link_names as_user))
 
