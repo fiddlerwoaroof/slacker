@@ -4,6 +4,7 @@
   :description "Describe hhgbot here"
   :author "Your Name <your.name@example.com>"
   :license "Specify license here"
+<<<<<<< HEAD
   :depends-on (#:alexandria
                #:blackbird
                #:carrier
@@ -24,6 +25,30 @@
                #:websocket-driver
                #:yason
                #:vecto)
+=======
+  :depends-on (
+          #:alexandria
+          #:blackbird
+          #:carrier
+          #:chanl
+          #:cl+ssl
+          #:cl-js
+          #:drakma
+          #:fast-http
+          #:flexi-streams
+          #:fwoar.lisputils
+          #:hunchensocket
+          #:positional-lambda
+          #:plump
+          #:puri
+          #:serapeum
+          #:ubiquitous
+	  #:vecto
+          #:websocket-driver
+          #:yason
+	  #:vecto
+          )
+>>>>>>> github/master
   :serial t
   :components ((:file "package")
                (:file "event-pump")

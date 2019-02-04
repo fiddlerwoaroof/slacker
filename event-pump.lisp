@@ -16,6 +16,10 @@
 
 (defmethod work-queue ((obj event-pump))
   (work-queue (queue-pair obj)))
+<<<<<<< HEAD
 
+=======
+     
+>>>>>>> github/master
 (defun clear-waiting-pings (event-pump)
   (setf (waiting-pings event-pump) 0))
