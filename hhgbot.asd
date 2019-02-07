@@ -6,7 +6,6 @@
   :license "Specify license here"
   :depends-on (#:alexandria
                #:blackbird
-               #:carrier
                #:chanl
                #:cl+ssl
                #:cl-js
@@ -23,7 +22,8 @@
                #:vecto
                #:websocket-driver
                #:yason
-               #:vecto)
+               #:vecto
+               #:fwoar-event-loop)
   :serial t
   :components ((:file "package")
                (:file "event-pump")

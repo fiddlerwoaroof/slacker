@@ -104,42 +104,33 @@
       (send-message event-pump :ping)
       (error 'connection-lost)))
 
-(defun network-loop (event-pump client-factory modules)
+
+(defmethod fwoar.event-loop:register-finish-cb (cb (event-pump event-pump))
+  (declare (ignore event-pump)))
+
+(defmethod fwoar.event-loop:prepare-loop ((event-pump event-pump))
+  (let ((client (funcall (client-factory event-pump) event-pump)))
+    (websocket-driver:start-connection client)))
+
+(defmethod fwoar.event-loop:tick ((task event-pump))
+  (handle-work-queue task)
+  (sleep 0.01))
+
+(defun network-loop (event-pump modules)
   (declare (optimize (debug 3)))
   (loop for (module . args) in modules
         do (start-module event-pump
                          (apply #'attach-module
                                 event-pump module args)))
-  (let ((client (funcall client-factory))
-        (connected nil))
-    (as:with-event-loop () 
-      (websocket-driver:start-connection client)
-      (setf connected t)
-      (as:with-interval (15)
-        (when connected
-          (restart-case (send-pings event-pump client)
-            (restart-server ()
-              (websocket-driver:close-connection client)
-              (setf connected nil)
-              (clear-waiting-pings event-pump)
-              (as:with-delay (10)
-                (cl+ssl:reset-library)
-                (websocket-driver:start-connection
-                 (setf client (funcall client-factory)))
-                (setf connected t))))))
-      (as:with-interval (0.01)
-        (when connected
-          (handle-work-queue event-pump))
-        :event-cb (lambda (ev)
-                    (format t "~&EVENT: ~a~%" ev))))))
+  (bt:make-thread (op (fwoar.event-loop:run-loop event-pump))))
 
 (defun start-client (&key (queue-pair (make-instance 'queue-pair)) modules)
-  (let* ((event-pump (make-instance 'event-pump :queue-pair queue-pair))
-         (client-factory (op (make-client event-pump))))
+  (let* ((event-pump (make-instance 'event-pump
+                                    :queue-pair queue-pair
+                                    :client-factory (op (make-client _)))))
     (values event-pump
             (bt:make-thread (lambda ()
                               (network-loop event-pump
-                                            client-factory
                                             modules))
                             :name "Event Server"
                             :initial-bindings `((*api-token* . ,*api-token*))))))

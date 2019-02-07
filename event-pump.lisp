@@ -8,6 +8,7 @@
   ((%ws-client :accessor ws-client :initarg :ws-client)
    (%waiting-pings :accessor waiting-pings :initform 0)
    (%modules :accessor modules :initform (make-hash-table))
+   (%client-factory :reader client-factory :initarg :client-factory :initform (error "must provide a client factory"))
    (%latest-id :accessor latest-id :initform 0)
    (%queue-pair :accessor queue-pair :initarg :queue-pair :initform (make-instance 'queue-pair))))
 
