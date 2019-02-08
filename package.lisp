@@ -14,7 +14,5 @@
   (:use))
 
 (defpackage :hhgbot-augmented-assistant
-  (:use :cl :alexandria :serapeum :slacker))
-;; (defpackage #:hhgbot
-;;   (:use #:cl #:positional-lambda))
-
+  (:use :cl :alexandria :serapeum :slacker)
+  (:export #:submit-js))

@@ -5,7 +5,10 @@
    (%result-queue :initarg :result-queue :reader result-queue :initform (make-instance 'chanl:unbounded-channel))))
 
 (defclass event-pump ()
-  ((%ws-client :accessor ws-client :initarg :ws-client)
+  ((%tick-pause :initform 0.01)
+   (%running :accessor running :initform nil)
+   (%finish-cb :reader finish-cb :writer fwoar.event-loop:register-finish-cb :initform nil)
+   (%ws-client :accessor ws-client :initarg :ws-client :initform nil)
    (%waiting-pings :accessor waiting-pings :initform 0)
    (%modules :accessor modules :initform (make-hash-table))
    (%client-factory :reader client-factory :initarg :client-factory :initform (error "must provide a client factory"))

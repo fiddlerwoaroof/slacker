@@ -26,6 +26,7 @@
                #:fwoar-event-loop)
   :serial t
   :components ((:file "package")
+               (:file "slack-api")
                (:file "event-pump")
                (:file "js-executor")
                (:file "slack-client")))

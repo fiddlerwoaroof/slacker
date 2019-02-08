@@ -22,7 +22,8 @@
                  (when message-p
                    (destructuring-bind (promise script) message
                      (handler-case
-                         (blackbird-base:finish promise (cl-js:run-js script))
-                       (t (c) (blackbird:signal-error promise c)))))
+                         (blackbird-base:finish promise
+                                                (cl-js:run-js script))
+                       (serious-condition (c) (blackbird:signal-error promise c)))))
 		             (sleep 0.4))))
 	         :name "js-executor")))
