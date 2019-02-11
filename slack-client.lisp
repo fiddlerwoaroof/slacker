@@ -29,8 +29,6 @@
               client)
         (wsd:on :message client
                 (lambda (message)
-                  #+null
-                  (format t "~&Got a message ~a~%" message)
                   (chanl:send (result-queue event-pump)
                               message)))
         client))))
@@ -73,6 +71,8 @@
 
 (defgeneric start-module (client module)
   (:documentation "start a module"))
+(defgeneric stop-module (client module)
+  (:documentation "stop a module"))
 
 (define-condition connection-lost (error)
   ())
@@ -92,7 +92,6 @@
       (chanl:recv (work-queue event-pump)
                   :blockp nil)
     (when message-p
-      (format t "Got a message")
       (funcall message
                event-pump))))
 
@@ -137,8 +136,8 @@
 
   (bt:make-thread (op (fwoar.event-loop:run-loop event-pump))))
 
-(defun start-client (&key (queue-pair (make-instance 'queue-pair)) modules)
-  (let* ((event-pump (make-instance 'event-pump
+(defun start-client (implementation &key (queue-pair (make-instance 'queue-pair)) modules)
+  (let* ((event-pump (make-instance implementation
                                     :queue-pair queue-pair
                                     :client-factory (op (make-client _)))))
     (setf (running event-pump) t)
@@ -162,7 +161,19 @@
             message-p)))
 
 (defparameter *ignored-messages* '(:pong :user_typing :desktop_notification))
+
 (defgeneric handle-message (type event-pump ts channel message)
+  (:method :around (type event-pump ts channel message)
+    (flet ((report-continue (stream)
+             (format stream "Skip message of type ~s" type))
+           (report-retry (stream)
+             (format stream "Retry message of type ~s" type)))
+      (tagbody start
+         (restart-case (call-next-method)
+           (continue () :report report-continue)
+           (skip-message () :report report-continue)
+           (retry () :report report-retry
+             (go start))))))
   (:method :before (type event-pump ts channel message)
     (declare (ignore event-pump ts channel))
     (unless (member type *ignored-messages*)
@@ -206,8 +217,9 @@
               (reply )))
     do (sleep 0.01)))
 
-(defun coordinate-threads (&optional queue-pair)
-  (let* ((event-pump (start-client :queue-pair queue-pair
+(defun coordinate-threads (&optional queue-pair (implementation 'event-pump))
+  (let* ((event-pump (start-client implementation
+                                   :queue-pair queue-pair
                                    :modules '((hhgbot-augmented-assistant::js-executor)))))
     (bt:make-thread (lambda () (loop until (running event-pump)
                                      finally (event-loop event-pump)))

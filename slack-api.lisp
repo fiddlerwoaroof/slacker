@@ -7,15 +7,17 @@
        (handler-case
            (let ((api-result (yason:parse
                               (babel:octets-to-string 
-                               (drakma:http-request (concat "https://slack.com/api/" method "?token=" *api-token*)
+                               (drakma:http-request (concat "https://slack.com/api/" method "?token="
+                                                            *api-token*)
                                                     :method :post
                                                     :content (quri:url-encode-params
                                                               (loop for (key value) on args by #'cddr
-                                                                    collect (cons (string-downcase key)
-                                                                                  value))))))))
-                                        ;todo error handling . . .
+                                                                    collect (cons
+                                                                             (string-downcase key)
+                                                                             value))))))))
+             ;; todo error handling . . .
              (resolve api-result)) 
-         (t (c)
+         (serious-condition (c)
            (format t "~&Received condition ~s~%" c)
            (reject c)))))))
 
@@ -44,7 +46,10 @@
 
 (slacker::define-api-wrappers
   (auth.test ())
+  (users.list () include_locale limit cursor)
   (channels.list () exclude_archived)
+  (conversations.list () exclude_archived types)
+  (conversations.join (channel)) 
   (chat.delete (ts channel) as_user)
   (chat.me-message (channel text))
   (chat.post-message (channel text)

@@ -1,7 +1,8 @@
 (cl:in-package :hhgbot-augmented-assistant)
 
 (defclass js-executor ()
-  ((%inp :accessor work-queue :initform (make-instance 'chanl:unbounded-channel))))
+  ((%thread :accessor thread :initform nil)
+   (%inp :accessor work-queue :initform (make-instance 'chanl:unbounded-channel))))
 
 (defparameter *js-executor* (make-instance 'js-executor))
 
@@ -27,3 +28,9 @@
                        (serious-condition (c) (blackbird:signal-error promise c)))))
 		             (sleep 0.4))))
 	         :name "js-executor")))
+
+(defmethod slacker:stop-module ((event-pump event-pump) (exe js-executor))
+  (declare (ignorable event-pump))
+  (with-accessors ((thread thread)) exe
+    (when thread
+      (bt:destroy-thread thread))))

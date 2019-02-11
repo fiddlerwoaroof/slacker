@@ -8,7 +8,8 @@
            #:define-command #:edit-message #:with-output-to-message
            #:help #:make-message #:modules #:latest-id #:work-queue #:result-queue
            #:ws-client #:waiting-pings #:ts #:channel :get-module
-           #:keep-in-thread #:ensure-thread #:handle-message))
+           #:keep-in-thread #:ensure-thread #:handle-message
+           #:stop-module))
 
 (defpackage slacker.api
   (:use))
