@@ -1,14 +1,24 @@
 (defpackage :slacker.montezuma-store
   (:use :cl :alexandria :serapeum :fw.lu)
-  (:export ))
+  (:export
+   #:montezuma-store))
 (in-package :slacker.montezuma-store)
 
 (defclass montezuma-store ()
-  ((%indexes :reader indexes :initform (make-hash-table :test #'equal))))
+  ((%indexes :reader indexes :initform (make-hash-table :test #'equal))
+   (%montezuma-index-path :reader index-path :initarg :index-path))
+  (:default-initargs :index-path nil))
 
 (defun ensure-index-for-type (store type)
   (ensure-gethash type (indexes store)
-                  (make-instance 'montezuma:index)))
+                  (if (index-path store)
+                      (make-instance 'montezuma:index :path (ensure-directories-exist
+                                                             (format nil "~a/~a/"
+                                                                     (index-path store)
+                                                                     type))
+                                                      :create-p nil
+                                                      :create-if-missing-p t)
+                      (make-instance 'montezuma:index))))
 
 (defgeneric combine-child (parent key value)
   (:method (parent k child)
@@ -37,9 +47,10 @@
 
 (defgeneric store-message (store message)
   (:method ((store montezuma-store) message)
-    (let ((type (gethash "type" message)))
-      (montezuma:add-document-to-index (ensure-index-for-type store type)
-                                       (flatten-hash-table message)))))
+    (let* ((type (gethash "type" message))
+           (index (ensure-index-for-type store type)))
+      (montezuma:add-document-to-index index (flatten-hash-table message))
+      (montezuma:flush index))))
 
 (defmethod slacker:handle-message :before (type (event-pump montezuma-store) ts channel message)
   (declare (ignore type ts channel))

@@ -4,11 +4,17 @@
 
 ;; Special Variables
 
+(defvar *xxx* (make-synonym-stream '*standard-output*))
 (defvar *client*)
 (defvar *queue-pair* nil)
 (defvar *slack-url* "https://~a.slack.com")
 (defparameter *refs* (make-hash-table :test 'equalp))
 ;; Macros
+
+
+(defclass hhgbot-event-pump (slacker:event-pump slacker.montezuma-store:montezuma-store)
+  ()
+  (:default-initargs :index-path "/tmp/slack-idx/"))
 
 (defun start-in-repl (&optional (start-bot t) (team-id :atomampd))
   (ubiquitous:restore :hhgbot-augmented-assistant)
@@ -29,7 +35,7 @@
       (let ((value (read-line)))
         (setf (ubiquitous:value :api-token team-id) value
               slacker::*api-token* value)))
-    (values (slacker:coordinate-threads *queue-pair*)
+    (values (slacker:coordinate-threads *queue-pair* 'hhgbot-event-pump)
             slacker::*api-token*)))
 
 (defun ensure-unescaped (src)
@@ -110,16 +116,57 @@
     (let ((keys (hash-table-keys *)))
       (gethash (random-elt keys) *))))
 
+(defun extract-channel-info (channels)
+  (funcall (data-lens:pick
+            (compose
+             (data-lens:applying (lambda (name id is-member is-private is-mpim)
+                                   (list name id
+                                         (plist-hash-table
+                                          (list "is-member" is-member
+                                                "is-private" is-private
+                                                "is-mpim" is-mpim)
+                                          :test 'equal))))
+             (data-lens:juxt (op (gethash "name" _))
+                             (op (gethash "id" _))
+                             (op (gethash "is_member" _))
+                             (op (gethash "is_private" _))
+                             (op (gethash "is_mpim" _)))))
+           (gethash "channels" channels)))
+
 (defun find-channel (name)
   (bb:alet* ((r (slacker.api:channels.list))
-             (channels (mapcar (op (pick '("name" "id") _)) (gethash "channels" r))))
+             (channels (funcall (data-lens:pick
+                                 (data-lens:juxt (op (gethash "name" _))
+                                                 (op (gethash "id" _))))
+                                (gethash "channels" r))))
+    (fw.su:log-json channels)
     (assoc name channels :test 'equal)))
 
-(define-command "notify-channel" (event-pump message channel &optional (target "general") &rest args)
+(defmacro with-output-to-json-string ((s &rest args &key indent) &body body)
+  "Set up a JSON streaming encoder context, then evaluate BODY.
+Return a string with the generated JSON output."
+  (declare (ignore indent))
+  `(with-output-to-string (,s)
+     (with-open-stream (,s (yason:make-json-output-stream s ,@args))
+       ,@body)))
+
+(defmacro dbind* (destructuring-expression promise-gen &body body)
+  `(bb:attach ,promise-gen
+              (fw.lu:destructuring-lambda (,destructuring-expression)
+                ,@body)))
+
+(defmethod slacker:handle-message :before (type (event-pump hhgbot-event-pump) ts channel message)
+  (declare (ignore type ts channel))
+  (index-message message)
+  (values))
+
+(define-command "notify-channel" (event-pump message channel
+                                             &optional target
+                                             &rest args)
   (format *xxx* "~&~a: ~{~a~^ ~}~%" target args)
-  (bb:alet* ((target-info (find-channel target)))
-    (if target-info
-        (destructuring-bind (target-name target-id) target-info
+  (dbind* (&optional target-name target-id) (find-channel target)
+    (if target-name
+        (progn
           (with (message (string-join args #\space))
             (when-let* ((start-link (position #\< message))
                         (stop-link (position #\> message :start start-link))
@@ -129,10 +176,10 @@
                                     (subseq message (1+ stop-link)))))
             (queue-message event-pump target-id
                            message))
-          (queue-message event-pump channel
+          (queue-message event-pump target-id
                          (format nil "Notifying channel ~a" target-name)
                          :thread (ensure-thread message)))
-        (queue-message event-pump channel (format nil "Can't find channel `~a`" target)
+        (queue-message event-pump target-id (format nil "Can't find channel `~a`" target)
                        :thread (ensure-thread message)))))
 
 (defparameter *reaction-store* (make-hash-table :test 'equalp :synchronized t))
