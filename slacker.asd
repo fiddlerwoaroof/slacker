@@ -1,6 +1,7 @@
 ;;;; hhgbot.asd
+(in-package :asdf-user)
 
-(asdf:defsystem #:hhgbot
+(asdf:defsystem #:slacker
   :description "Describe hhgbot here"
   :author "Your Name <your.name@example.com>"
   :license "Specify license here"
@@ -31,3 +32,11 @@
                (:file "js-executor")
                (:file "slack-client")))
 
+(defsystem :slacker/montezuma-store 
+  :description ""
+  :author "Ed L <edward@elangley.org>"
+  :license "MIT"
+  :depends-on (#:slacker
+               #:montezuma)
+  :serial t
+  :components ((:file "montezuma-store")))
