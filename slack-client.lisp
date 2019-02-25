@@ -19,7 +19,7 @@
   (flet ((get-ws-url (slack-response)
            (gethash "url" slack-response)))
     (fw.lu:let-each (:be slack-data)
-      (format nil "https://slack.com/api/rtm.start?token=~a" *api-token*)
+      (format nil "https://slack.com/api/rtm.connect?token=~a" *api-token*)
       (drakma:http-request slack-data :want-stream t)
       (yason:parse slack-data)
 

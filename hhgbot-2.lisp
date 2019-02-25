@@ -11,8 +11,12 @@
 (defparameter *refs* (make-hash-table :test 'equalp))
 ;; Macros
 
+(defclass logging-slackbot ()
+  ((%users :initform (make-hash-table :test 'equal))
+   (%conversations :initform (make-hash-table :test 'equal))))
 
-(defclass hhgbot-event-pump (slacker:event-pump slacker.montezuma-store:montezuma-store)
+
+(defclass hhgbot-event-pump (slacker:event-pump slacker.montezuma-store:montezuma-store logging-slackbot)
   ()
   (:default-initargs :index-path "/tmp/slack-idx/"))
 
