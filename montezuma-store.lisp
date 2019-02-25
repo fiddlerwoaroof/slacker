@@ -1,13 +1,20 @@
 (defpackage :slacker.montezuma-store
   (:use :cl :alexandria :serapeum :fw.lu)
   (:export
-   #:montezuma-store))
+   #:montezuma-store
+   #:search-index))
 (in-package :slacker.montezuma-store)
 
 (defclass montezuma-store ()
   ((%indexes :reader indexes :initform (make-hash-table :test #'equal))
    (%montezuma-index-path :reader index-path :initarg :index-path))
   (:default-initargs :index-path nil))
+
+(defun search-index (store index text)
+  (let* ((indexes (indexes store))
+	 (index (gethash index indexes)))
+    (values (montezuma:search index (format nil "!text:\";arc\" text:~a" text) :num-docs 3)
+	    index)))
 
 (defun ensure-index-for-type (store type)
   (ensure-gethash type (indexes store)

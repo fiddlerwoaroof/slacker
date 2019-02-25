@@ -96,16 +96,16 @@
                       (progn ,@body)
                       :thread (keep-in-thread ,message-sym)))))
 
-;; (define-command "defini" (event-pump message channel word &rest a)
-;;   (declare (ignore a))
-;;   (let* ((results (words-coprocess::get-word-results word))
-;;          (json-objs (split-sequence #\newline results :remove-empty-subseqs t))
-;;          (parsed (mapcar 'yason:parse json-objs)))
-;;     (queue-message event-pump channel
-;;                    (format nil "~{> ~a~2%~}"
-;;                            (remove-if-not #'identity
-;;                                           (mapcan (op (gethash "meanings" _))
-;;                                                   parsed))))))
+(define-command "latina" (event-pump message channel word &rest a)
+  (declare (ignore a))
+  (let* ((results (words-coprocess::get-word-results word))
+	 (json-objs (split-sequence #\newline results :remove-empty-subseqs t))
+	 (parsed (mapcar 'yason:parse json-objs)))
+    (queue-message event-pump channel
+		   (format nil "~{> ~a~2%~}"
+			   (remove-if-not #'identity
+					  (mapcan (op (gethash "meanings" _))
+						  parsed))))))
 
 (define-message-command "random-quote" (event-pump message channel &rest args)
   args
@@ -115,6 +115,33 @@
     (gethash * *refs*)
     (let ((keys (hash-table-keys *)))
       (gethash (random-elt keys) *))))
+
+(defun trace-value (&rest args)
+  (format *trace-output* "===>>> ~{~s~^ ~}" args)
+  (values-list args))
+
+(define-message-command "arc" (event-pump message channel &rest args)
+  (let ((r (with-output-to-string (s)
+	     (multiple-value-bind (results idx)
+		 (slacker.montezuma-store:search-index *client* "message" (string-join args " "))
+	       (montezuma:each results
+			       (lambda (h)
+				 (format s "> ~a: ~a~%"
+					 (local-time:format-timestring
+					  nil
+					  (local-time:unix-to-timestamp
+					   (floor 
+					    (parse-number
+					     (montezuma:document-value (montezuma:get-document idx (montezuma:doc h))
+								       "ts")))
+					   )
+					  :format local-time:+rfc3339-format+)
+					 
+					 (montezuma:document-value (montezuma:get-document idx (montezuma:doc h))
+								   "text"))))))))
+    (if (= 0 (length r))
+        (format nil "No results found for: `~a`" (string-join args " "))
+	r)))
 
 (defun extract-channel-info (channels)
   (funcall (data-lens:pick
@@ -139,7 +166,7 @@
                                  (data-lens:juxt (op (gethash "name" _))
                                                  (op (gethash "id" _))))
                                 (gethash "channels" r))))
-    (fw.su:log-json channels)
+#+nil    (fw.su:log-json channels)
     (assoc name channels :test 'equal)))
 
 (defmacro with-output-to-json-string ((s &rest args &key indent) &body body)
@@ -157,6 +184,7 @@ Return a string with the generated JSON output."
 
 (defmethod slacker:handle-message :before (type (event-pump hhgbot-event-pump) ts channel message)
   (declare (ignore type ts channel))
+#+nil
   (index-message message)
   (values))
 
@@ -240,19 +268,19 @@ Return a string with the generated JSON output."
 (define-view random-quote (model)
   (destructuring-bind ((book . ref) . text) model
     `(302
-      ("Location"  ,(format nil "https://srv2.elangley.org/aquinas_quote/q/~a/~a"
+      ("Location"  ,(format nil "http://hhgbot.edw.ai:5000/q/~a/~a"
                             book ref))
       (,text))))
 
 (define-spinneret-view quote (quote)
   (let ((title (format nil "Quote: ~a, ~a" (caar quote) (cdar quote)))
-        (permalink (format nil "https://srv2.elangley.org/aquinas_quote/q/~a/~a"
+        (permalink (format nil "http://hhgbot.edw.ai:5000/q/~a/~a"
                            (caar quote)
                            (cdar quote))))
     (:html
      (:head (:title title)
             (:link :href "https://fonts.googleapis.com/css?family=Lato:400&subset=latin,latin-ext" :rel "stylesheet" :type "text/css")
-            (:style "p { font-family: 'Lato', sans-serif; width: 50vw; margin-left: 25vw; } p:first-child { margin-top: 10vh; }")
+            (:style "p { font-family: 'Lato', sans-serif; width: 50vw; margin-left: 25vw; } p::first-letter {color:red} p:first-child { margin-top: 10vh; }")
             (:meta :property "og:title" :content title)
             (:meta :property "fb:app_id" :content "521205154682685")
             (:meta :property "og:url" :content permalink)
@@ -260,7 +288,7 @@ Return a string with the generated JSON output."
      (:body
       (:p (cdr quote))
       (:p (:a :href permalink permalink))
-      (:p (:a :href "/aquinas_quote/" "Random quote"))))))
+      (:p (:a :href "/" "Random quote"))))))
 
 (defroutes *app*
   (("/" :GET) (as-route 'random-quote))
