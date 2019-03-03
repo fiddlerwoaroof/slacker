@@ -232,7 +232,7 @@
                     :name "Event Loop") 
     event-pump))
 
-(defparameter *command-table* (make-hash-table :test 'equal))
+(defvar *command-table* (make-hash-table :test 'equal))
 
 (defun quote-output (str)
   (with-output-to-string (s)
@@ -339,7 +339,7 @@
         :quote t))))
 
 
-(defparameter *id* 0)
+(defvar *id* 0)
 (defun make-message (data channel)
   (incf *id*)
   (with-output-to-string (s)
