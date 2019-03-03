@@ -31,7 +31,13 @@
                 (lambda (message)
                   (chanl:send (result-queue event-pump)
                               message)))
-        client))))
+        (wsd:on :close client
+                (lambda (&key code reason)
+                  (format t "~&Closed with code: ~a for reason ~a. Restarting in 2 seconds~%" code reason)
+                  (sleep 2)
+                  (format t "~& ... restarting~%")
+                  (make-client event-pump)))
+        (wsd:start-connection client)))))
 
 (defgeneric send-message (client type &key)
   (:documentation "Send a slack message")
