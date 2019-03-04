@@ -1,5 +1,10 @@
 (defpackage :hhgbot-2
   (:use :cl :alexandria :serapeum :slacker :fw.lu))
+
+(defpackage :quote-server
+  (:use :cl :ningle :araneus :serapeum :alexandria :fw.lu)
+   (:export #:start))
+
 (cl:in-package :hhgbot-2)
 
 ;; Special Variables
@@ -248,8 +253,12 @@ Return a string with the generated JSON output."
            (with-input-from-file (s filename :external-format :utf-8)
              (read-refs s))))
 
-(defpackage :quote-server
-  (:use :cl :ningle :araneus :serapeum :alexandria :fw.lu))
+(defun main ()
+  (initialize-quotes)
+  (quote-server:start)
+  (setf (values *client* slacker::*api-token*)
+	(start-in-repl)))
+
 (in-package :quote-server)
 
 (defparameter *app* (make-instance '<app>))
