@@ -202,22 +202,22 @@ Return a string with the generated JSON output."
                                              &rest args)
   (format *xxx* "~&~a: ~{~a~^ ~}~%" target args)
   (dbind* (&optional target-name target-id) (find-channel target)
-    (if target-name
-        (progn
-          (with (message (string-join args #\space))
-            (when-let* ((start-link (position #\< message))
-                        (stop-link (position #\> message :start start-link))
-                        (_ (> stop-link (+ 4 start-link))))
-              (setf message (concat (subseq message 0 start-link)
-                                    (subseq message (1+ start-link) stop-link)
-                                    (subseq message (1+ stop-link)))))
-            (queue-message event-pump target-id
-                           message))
-          (queue-message event-pump target-id
-                         (format nil "Notifying channel ~a" target-name)
-                         :thread (ensure-thread message)))
-        (queue-message event-pump target-id (format nil "Can't find channel `~a`" target)
-                       :thread (ensure-thread message)))))
+          (if target-name
+              (progn
+                (with (message (string-join args #\space))
+                  (when-let* ((start-link (position #\< message))
+                              (stop-link (position #\> message :start start-link))
+                              (_ (> stop-link (+ 4 start-link))))
+                    (setf message (concat (subseq message 0 start-link)
+                                          (subseq message (1+ start-link) stop-link)
+                                          (subseq message (1+ stop-link)))))
+                  (queue-message event-pump target-id
+                                 message))
+                (queue-message event-pump target-id
+                               (format nil "Notifying channel ~a" target-name)
+                               :thread (ensure-thread message)))
+              (queue-message event-pump target-id (format nil "Can't find channel `~a`" target)
+                             :thread (ensure-thread message)))))
 
 (defparameter *reaction-store* (make-hash-table :test 'equalp :synchronized t))
 

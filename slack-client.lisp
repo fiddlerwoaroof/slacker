@@ -1,18 +1,5 @@
 (in-package :slacker)
 
-(defmethod attach-module ((event-pump event-pump) module &rest args &key)
-  (setf (gethash (make-keyword module)
-                 (modules event-pump))
-        (apply #'make-instance
-               module
-               args)))
-
-(defgeneric get-module (module event-pump)
-  (:documentation "Get one of the activated modules")
-  (:method (module (event-pump event-pump))
-    (gethash (make-keyword module)
-             (modules event-pump))))
-
 (defvar *api-token*) 
 
 (defun make-client (event-pump)
@@ -33,10 +20,14 @@
                               message)))
         (wsd:on :close client
                 (lambda (&key code reason)
-                  (format t "~&Closed with code: ~a for reason ~a. Restarting in 2 seconds~%" code reason)
-                  (sleep 2)
-                  (format t "~& ... restarting~%")
-                  (make-client event-pump)))
+                  (if (running event-pump)
+                      (progn
+                        (format t "~&Closed with code: ~a for reason ~a. Restarting in 2 seconds~%"
+                                code reason)
+                        (sleep 2)
+                        (format t "~& ... restarting~%")
+                        (make-client event-pump))
+                      (format t "~&exiting~%"))))
         (wsd:start-connection client)))))
 
 (defgeneric send-message (client type &key)
@@ -75,11 +66,6 @@
                       :test 'equal)))
 
 
-(defgeneric start-module (client module)
-  (:documentation "start a module"))
-(defgeneric stop-module (client module)
-  (:documentation "stop a module"))
-
 (define-condition connection-lost (error)
   ())
 
@@ -108,29 +94,6 @@
   (if (> 100 (waiting-pings event-pump))
       (send-message event-pump :ping)
       (error 'connection-lost)))
-
-(defmethod fwoar.event-loop:prepare-loop ((event-pump event-pump))
-  (declare (optimize (debug 3)))
-  (let ((client (funcall (client-factory event-pump) event-pump)))
-    (websocket-driver:start-connection client)))
-
-(defmethod fwoar.event-loop:cleanup ((event-pump event-pump))
-  (setf (running event-pump) nil)
-  (when (ws-client event-pump)
-    (wsd:close-connection (ws-client event-pump))))
-
-(let ((last-ping nil))
-  (defun maybe-ping (event-pump)
-    (let ((current-time  (get-universal-time)))
-      (when (or (null last-ping)
-                (< 15 (- current-time last-ping)))
-        (setf last-ping current-time)
-        (websocket-driver:send-ping (ws-client event-pump))))))
-
-(defmethod fwoar.event-loop:tick ((task event-pump))
-  (handle-work-queue task)
-  (maybe-ping task)
-  (sleep (slot-value task '%tick-pause)))
 
 (defun network-loop (event-pump modules)
   (declare (optimize (debug 3)))
