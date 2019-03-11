@@ -7,7 +7,7 @@
 (defclass event-pump ()
   ((%tick-pause :initform 0.01)
    (%running :accessor running :initform nil)
-   (%finish-cb :reader finish-cb :writer fwoar.event-loop:register-finish-cb :initform nil)
+   (%finish-cb :accessor fwoar.event-loop:finish-cb :initform nil)
    (%ws-client :accessor ws-client :initarg :ws-client :initform nil)
    (%waiting-pings :accessor waiting-pings :initform 0)
    (%modules :accessor modules :initform (make-hash-table))
@@ -30,11 +30,11 @@
   (setf (waiting-pings event-pump) 0))
 
 (defmethod fwoar.event-loop:prepare-loop ((event-pump event-pump))
-  (declare (optimize (debug 3)))
-  (let ((client (funcall (client-factory event-pump) event-pump)))
-    #+nil (websocket-driver:start-connection client)))
+  (funcall (client-factory event-pump)
+           event-pump))
 
 (defmethod fwoar.event-loop:cleanup ((event-pump event-pump))
+  (format t "~&cleaning up...~&")
   (setf (running event-pump) nil)
   (do-hash-table (_ v (modules event-pump))
     (declare (ignore _))
@@ -78,7 +78,7 @@
              (modules event-pump))))
 
 (defun stop-slacker (event-pump)
-  (funcall (finish-cb event-pump)))
+  (funcall (fwoar.event-loop:finish-cb event-pump)))
 
 (defun throttle-continue (num)
   (let ((continue-count 0)

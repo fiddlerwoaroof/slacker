@@ -3,7 +3,7 @@
 
 (defpackage :quote-server
   (:use :cl :ningle :araneus :serapeum :alexandria :fw.lu)
-   (:export #:start))
+  (:export #:start))
 
 (cl:in-package :hhgbot-2)
 
@@ -108,13 +108,13 @@
 (define-command "latina" (event-pump message channel word &rest a)
   (declare (ignore a))
   (let* ((results (words-coprocess::get-word-results word))
-	 (json-objs (split-sequence #\newline results :remove-empty-subseqs t))
-	 (parsed (mapcar 'yason:parse json-objs)))
+         (json-objs (split-sequence #\newline results :remove-empty-subseqs t))
+         (parsed (mapcar 'yason:parse json-objs)))
     (queue-message event-pump channel
-		   (format nil "~{> ~a~2%~}"
-			   (remove-if-not #'identity
-					  (mapcan (op (gethash "meanings" _))
-						  parsed))))))
+                   (format nil "~{> ~a~2%~}"
+                           (remove-if-not #'identity
+                                          (mapcan (op (gethash "meanings" _))
+                                                  parsed))))))
 
 (define-message-command "random-quote" (event-pump message channel &rest args)
   args
@@ -131,26 +131,26 @@
 
 (define-message-command "arc" (event-pump message channel &rest args)
   (let ((r (with-output-to-string (s)
-	     (multiple-value-bind (results idx)
-		 (slacker.montezuma-store:search-index *client* "message" (string-join args " "))
-	       (montezuma:each results
-			       (lambda (h)
-				 (format s "> ~a: ~a~%"
-					 (local-time:format-timestring
-					  nil
-					  (local-time:unix-to-timestamp
-					   (floor 
-					    (parse-number
-					     (montezuma:document-value (montezuma:get-document idx (montezuma:doc h))
-								       "ts")))
-					   )
-					  :format local-time:+rfc3339-format+)
-					 
-					 (montezuma:document-value (montezuma:get-document idx (montezuma:doc h))
-								   "text"))))))))
+             (multiple-value-bind (results idx)
+                 (slacker.montezuma-store:search-index *client* "message" (string-join args " "))
+               (montezuma:each results
+                               (lambda (h)
+                                 (format s "> ~a: ~a~%"
+                                         (local-time:format-timestring
+                                          nil
+                                          (local-time:unix-to-timestamp
+                                           (floor 
+                                            (parse-number
+                                             (montezuma:document-value (montezuma:get-document idx (montezuma:doc h))
+                                                                       "ts")))
+                                           )
+                                          :format local-time:+rfc3339-format+)
+                                         
+                                         (montezuma:document-value (montezuma:get-document idx (montezuma:doc h))
+                                                                   "text"))))))))
     (if (= 0 (length r))
         (format nil "No results found for: `~a`" (string-join args " "))
-	r)))
+        r)))
 
 (defun extract-channel-info (channels)
   (funcall (data-lens:pick
@@ -175,7 +175,7 @@
                                  (data-lens:juxt (op (gethash "name" _))
                                                  (op (gethash "id" _))))
                                 (gethash "channels" r))))
-#+nil    (fw.su:log-json channels)
+    #+nil    (fw.su:log-json channels)
     (assoc name channels :test 'equal)))
 
 (defmacro with-output-to-json-string ((s &rest args &key indent) &body body)
@@ -193,7 +193,7 @@ Return a string with the generated JSON output."
 
 (defmethod slacker:handle-message :before (type (event-pump hhgbot-event-pump) ts channel message)
   (declare (ignore type ts channel))
-#+nil
+  #+nil
   (index-message message)
   (values))
 
@@ -202,22 +202,22 @@ Return a string with the generated JSON output."
                                              &rest args)
   (format *xxx* "~&~a: ~{~a~^ ~}~%" target args)
   (dbind* (&optional target-name target-id) (find-channel target)
-          (if target-name
-              (progn
-                (with (message (string-join args #\space))
-                  (when-let* ((start-link (position #\< message))
-                              (stop-link (position #\> message :start start-link))
-                              (_ (> stop-link (+ 4 start-link))))
-                    (setf message (concat (subseq message 0 start-link)
-                                          (subseq message (1+ start-link) stop-link)
-                                          (subseq message (1+ stop-link)))))
-                  (queue-message event-pump target-id
-                                 message))
-                (queue-message event-pump target-id
-                               (format nil "Notifying channel ~a" target-name)
-                               :thread (ensure-thread message)))
-              (queue-message event-pump target-id (format nil "Can't find channel `~a`" target)
-                             :thread (ensure-thread message)))))
+    (if target-name
+        (progn
+          (with (message (string-join args #\space))
+            (when-let* ((start-link (position #\< message))
+                        (stop-link (position #\> message :start start-link))
+                        (_ (> stop-link (+ 4 start-link))))
+              (setf message (concat (subseq message 0 start-link)
+                                    (subseq message (1+ start-link) stop-link)
+                                    (subseq message (1+ stop-link)))))
+            (queue-message event-pump target-id
+                           message))
+          (queue-message event-pump target-id
+                         (format nil "Notifying channel ~a" target-name)
+                         :thread (ensure-thread message)))
+        (queue-message event-pump target-id (format nil "Can't find channel `~a`" target)
+                       :thread (ensure-thread message)))))
 
 (defparameter *reaction-store* (make-hash-table :test 'equalp :synchronized t))
 
@@ -257,7 +257,7 @@ Return a string with the generated JSON output."
   (initialize-quotes)
   (quote-server:start)
   (setf (values *client* slacker::*api-token*)
-	(start-in-repl)))
+        (start-in-repl)))
 
 (in-package :quote-server)
 

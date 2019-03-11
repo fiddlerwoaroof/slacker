@@ -103,7 +103,7 @@
                         (apply #'attach-module
                                event-pump module args)))
 
-  (bt:make-thread (op (fwoar.event-loop:run-loop event-pump))))
+  (fwoar.event-loop:run-loop event-pump))
 
 (defun start-client (implementation &key (queue-pair (make-instance 'queue-pair)) modules)
   (let* ((event-pump (make-instance implementation
@@ -190,8 +190,11 @@
   (let* ((event-pump (start-client implementation
                                    :queue-pair queue-pair
                                    :modules '((hhgbot-augmented-assistant::js-executor)))))
-    (bt:make-thread (lambda () (loop until (running event-pump)
-                                     finally (event-loop event-pump)))
+    (bt:make-thread (lambda ()
+                      (loop until (running event-pump)
+                            finally
+                               (unwind-protect (event-loop event-pump)
+                                 (stop-slacker event-pump))))
                     :name "Event Loop") 
     event-pump))
 
