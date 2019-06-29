@@ -53,5 +53,6 @@
   (chat.delete (ts channel) as_user)
   (chat.me-message (channel text))
   (chat.post-message (channel text)
-                     parse link_name attachments unfurl_links unfurl_media username as_user icon_uri icon_emoji)
+                     parse link_name attachments unfurl_links unfurl_media username as_user
+                     icon_uri icon_emoji)
   (chat.update (ts channel text) attachments parse link_names as_user))
