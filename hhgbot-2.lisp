@@ -7,6 +7,17 @@
 
 (cl:in-package :hhgbot-2)
 
+(defun normalize-ref (value)
+  (when (or (alexandria:ends-with-subseq "co" value)
+            (alexandria:ends-with-subseq "s.c" value))
+    (setf value (format nil "~a." value)))
+  (when (alexandria:ends-with-subseq "sc" value)
+    (setf value (format nil "~as.c." (subseq value 0 (- (length value) 2)))))
+  (when (alexandria:ends-with-subseq "sc." value)
+    (setf value (format nil "~as.c." (subseq value 0 (- (length value) 3)))))
+
+  value)
+
 ;; Special Variables
 
 (defvar *xxx* (make-synonym-stream '*standard-output*))
@@ -21,9 +32,10 @@
    (%conversations :initform (make-hash-table :test 'equal))))
 
 
-(defclass hhgbot-event-pump (slacker:event-pump slacker.montezuma-store:montezuma-store logging-slackbot)
+(defclass hhgbot-event-pump (slacker:event-pump #+(or)slacker.montezuma-store:montezuma-store logging-slackbot
+			     slacker.postmodern-store:postmodern-store)
   ()
-  (:default-initargs :index-path "/tmp/slack-idx/"))
+  #+(or)(:default-initargs :index-path "/tmp/slack-idx/"))
 
 (defun start-in-repl (&optional (start-bot t) (team-id :atomampd))
   (ubiquitous:restore :hhgbot-augmented-assistant)
@@ -44,7 +56,8 @@
       (let ((value (read-line)))
         (setf (ubiquitous:value :api-token team-id) value
               slacker::*api-token* value)))
-    (values (slacker:coordinate-threads *queue-pair* 'hhgbot-event-pump)
+    (values (slacker:coordinate-threads *queue-pair* 'hhgbot-event-pump
+					'(:postgres-connection-spec ("edwlan" "edwlan" nil :unix)))
             slacker::*api-token*)))
 
 (defun ensure-unescaped (src)
@@ -90,10 +103,13 @@
 
 (define-command "ref>" (event-pump message channel &optional source ref &rest args)
   (declare (ignore args))
+  (when args
+    (setf ref (format nil "~a~{~a~}" ref args)))
+
   (if (and source ref)
       (when-let ((source-h (gethash source *refs*)))
         (queue-message event-pump channel
-                       (gethash ref source-h (concat "Can't find " source " " ref))
+                       (gethash (normalize-ref ref) source-h (concat "Can't find " source " " ref))
                        :thread (keep-in-thread message)))
       (queue-message event-pump channel (concat "Must provide both a source and a reference. See ;sources")
                      :thread (keep-in-thread message))))
@@ -130,27 +146,30 @@
   (values-list args))
 
 (define-message-command "arc" (event-pump message channel &rest args)
-  (let ((r (with-output-to-string (s)
-             (multiple-value-bind (results idx)
-                 (slacker.montezuma-store:search-index *client* "message" (string-join args " "))
-               (montezuma:each results
-                               (lambda (h)
-                                 (format s "> ~a: ~a~%"
-                                         (local-time:format-timestring
-                                          nil
-                                          (local-time:unix-to-timestamp
-                                           (floor 
-                                            (parse-number
-                                             (montezuma:document-value (montezuma:get-document idx (montezuma:doc h))
-                                                                       "ts")))
-                                           )
-                                          :format local-time:+rfc3339-format+)
-                                         
-                                         (montezuma:document-value (montezuma:get-document idx (montezuma:doc h))
-                                                                   "text"))))))))
-    (if (= 0 (length r))
-        (format nil "No results found for: `~a`" (string-join args " "))
-        r)))
+  (if (equal (gethash "user" message)
+	     "U0CSPP3SB")
+      (let ((r (with-output-to-string (s)
+		 (multiple-value-bind (results idx)
+		     (slacker.montezuma-store:search-index *client* "message" (string-join args " "))
+		   (montezuma:each results
+				   (lambda (h)
+				     (format s "> ~a: ~a~%"
+					     (local-time:format-timestring
+					      nil
+					      (local-time:unix-to-timestamp
+					       (floor 
+						(parse-number
+						 (montezuma:document-value (montezuma:get-document idx (montezuma:doc h))
+									   "ts")))
+					       )
+					      :format local-time:+rfc3339-format+)
+					     
+					     (montezuma:document-value (montezuma:get-document idx (montezuma:doc h))
+								       "text"))))))))
+	(if (= 0 (length r))
+	    (format nil "No results found for: `~a`" (string-join args " "))
+	    r))
+      (format nil "No results found for: `~a`" (string-join args " "))))
 
 (defun extract-channel-info (channels)
   (funcall (data-lens:pick
@@ -266,7 +285,9 @@ Return a string with the generated JSON output."
 (define-controller quote (params)
   (let* ((text (cdr (assoc :text params)))
          (ref (cdr (assoc :ref params))))
-    (cons (cons text ref) (gethash ref (gethash text hhgbot-2::*refs*)))))
+    (cons (cons text ref)
+	  (gethash (hhgbot-2::normalize-ref ref)
+		   (gethash text hhgbot-2::*refs*)))))
 
 (define-controller random-quote (params)
   (declare (ignore params))
@@ -281,15 +302,15 @@ Return a string with the generated JSON output."
 (define-view random-quote (model)
   (destructuring-bind ((book . ref) . text) model
     `(302
-      ("Location"  ,(format nil "http://hhgbot.edw.ai:5000/q/~a/~a"
+      ("Location"  ,(format nil "/q/~a/~a"
                             book ref))
       (,text))))
 
 (define-spinneret-view quote (quote)
   (let ((title (format nil "Quote: ~a, ~a" (caar quote) (cdar quote)))
-        (permalink (format nil "http://hhgbot.edw.ai:5000/q/~a/~a"
+        (permalink (format nil "/q/~a/~a"
                            (caar quote)
-                           (cdar quote))))
+                           (hhgbot-2::normalize-ref (cdar quote)))))
     (:html
      (:head (:title title)
             (:link :href "https://fonts.googleapis.com/css?family=Lato:400&subset=latin,latin-ext" :rel "stylesheet" :type "text/css")

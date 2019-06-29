@@ -105,10 +105,11 @@
 
   (fwoar.event-loop:run-loop event-pump))
 
-(defun start-client (implementation &key (queue-pair (make-instance 'queue-pair)) modules)
-  (let* ((event-pump (make-instance implementation
-                                    :queue-pair queue-pair
-                                    :client-factory (op (make-client _)))))
+(defun start-client (implementation &key (queue-pair (make-instance 'queue-pair)) modules impl-args)
+  (let* ((event-pump (apply #'make-instance implementation
+			    :queue-pair queue-pair
+			    :client-factory (op (make-client _))
+			    impl-args)))
     (setf (running event-pump) t)
     (values event-pump
             (bt:make-thread (lambda ()
@@ -186,10 +187,11 @@
               (reply )))
     do (sleep 0.01)))
 
-(defun coordinate-threads (&optional queue-pair (implementation 'event-pump))
+(defun coordinate-threads (&optional queue-pair (implementation 'event-pump) args)
   (let* ((event-pump (start-client implementation
                                    :queue-pair queue-pair
-                                   :modules '((hhgbot-augmented-assistant::js-executor)))))
+                                   :modules '((hhgbot-augmented-assistant::js-executor))
+                                   :impl-args args)))
     (bt:make-thread (lambda ()
                       (loop until (running event-pump)
                             finally
